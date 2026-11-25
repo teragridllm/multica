@@ -89,7 +89,7 @@ Les membres qui ont accès au projet peuvent consulter les chemins enregistrés.
 
 L'agent travaille directement dans le répertoire fixe, avec accès à la branche actuelle et aux fichiers non commités. Les exécutions qui utilisent le même répertoire sur le même ordinateur se succèdent selon les [règles du mode Direct](#comment-les-exécutions-partagent-le-répertoire).
 
-Ce réglage s'applique lorsqu'un agent précis est désigné ou @mentionné sur une tâche, y compris pour les nouvelles tentatives et les exécutions de suivi. Le runtime lit le réglage en vigueur lorsqu'il prend en charge l'exécution. Un changement de répertoire ouvre une nouvelle session. Si aucun répertoire n'est configuré, ou si le chemin configuré est introuvable ou invalide, l'exécution échoue avant le démarrage de l'agent. Si vous déplacez l'agent vers un autre ordinateur, enregistrez à nouveau le chemin pour cet ordinateur, même si le chemin absolu est identique.
+Ce réglage s'applique lorsqu'un agent précis est désigné ou @mentionné sur une tâche, y compris pour les nouvelles tentatives et les exécutions de suivi. Il s’applique aussi dès la première exécution si vous choisissez le projet et un agent précis dans **Créer avec un agent**. Le runtime lit le réglage en vigueur lorsqu'il prend en charge l'exécution. Un changement de répertoire ouvre une nouvelle session. Si aucun répertoire n'est configuré, ou si le chemin configuré est introuvable ou invalide, l'exécution échoue avant le démarrage de l'agent. Si vous déplacez l'agent vers un autre ordinateur, enregistrez à nouveau le chemin pour cet ordinateur, même si le chemin absolu est identique.
 
 Ce réglage est désactivé par défaut. Lorsqu'il est désactivé, le projet peut utiliser ses dépôts et dossiers locaux partagés.
 

@@ -89,7 +89,7 @@ Members who can open the project can see the saved paths. To add or edit a path,
 
 The agent works directly in the fixed directory, including on the current branch and uncommitted files. Runs that use the same directory on the same machine take turns under the [Direct mode rules](#how-runs-share-the-directory).
 
-This setting applies when a specific agent is assigned or @mentioned on an issue, including retries and follow-up runs. Each run reads the latest setting when claimed. Changing the directory starts a new session. If the agent has no directory configured, or the configured path is missing or invalid, the run fails before the agent starts. If you move the agent to another machine, save the path again for that machine, even if the absolute path is identical.
+This setting applies when a specific agent is assigned or @mentioned on an issue, including retries and follow-up runs. It also applies when you select the project and a specific agent in **Create with agent**, starting with the first run. Each run reads the latest setting when claimed. Changing the directory starts a new session. If the agent has no directory configured, or the configured path is missing or invalid, the run fails before the agent starts. If you move the agent to another machine, save the path again for that machine, even if the absolute path is identical.
 
 The setting is off by default. With it off, the project can use linked repositories and shared local folders.
 

@@ -3380,26 +3380,9 @@ func (h *Handler) buildClaimedTaskResponse(r *http.Request, task *db.AgentTaskQu
 		resp.ProjectWorkflow = projectWorkflow
 		var fixedWorkdir string
 		if projectCtx.ProjectID != "" && !task.IsLeaderTask && !task.SquadID.Valid && !task.AutopilotRunID.Valid {
-			settings, err := h.loadProjectAgentWorkdirSettings(r.Context(), issue.WorkspaceID, issue.ProjectID)
-			if err != nil {
-				slog.Error("issue claim: load project execution directories failed", "task_id", uuidToString(task.ID), "error", err)
-				return resp, deliveredCommentIDs, issueSnapshot, agentSkillCount, builtinSkillCount, &claimBuildFailure{
-					outcome: "error_project_agent_workdir", status: http.StatusInternalServerError,
-					message: "failed to load project execution directories",
-				}
-			}
-			var daemonID, rejection string
-			if runtime.RuntimeMode == "local" && runtime.DaemonID.Valid {
-				daemonID = runtime.DaemonID.String
-			}
-			// A daemon that understands local worktrees also understands the
-			// in-place local_directory resource used for this binding.
-			fixedWorkdir, rejection = routeProjectAgentWorkdir(&resp, settings, uuidToString(task.AgentID), daemonID,
-				requestHasClientCapability(r, protocol.DaemonCapabilityLocalWorktreeV1))
-			if rejection != "" {
-				return resp, deliveredCommentIDs, issueSnapshot, agentSkillCount, builtinSkillCount,
-					h.failClaimedTaskBeforeLaunch(r.Context(), task, rejection, taskfailure.Reason("local_directory_error"),
-						"error_project_agent_workdir", http.StatusUnprocessableEntity, rejection)
+			fixedWorkdir, failure = h.applyClaimProjectAgentWorkdir(r, &resp, task, runtime, issue.WorkspaceID, issue.ProjectID)
+			if failure != nil {
+				return resp, deliveredCommentIDs, issueSnapshot, agentSkillCount, builtinSkillCount, failure
 			}
 		}
 
@@ -4146,7 +4129,8 @@ func (h *Handler) buildClaimedTaskResponse(r *http.Request, task *db.AgentTaskQu
 					quickCreateProjectID = parsed
 				}
 			}
-			projectCtx, projectErr := h.resolveClaimProjectContext(r.Context(), quickCreateProjectID, parseUUID(qc.WorkspaceID))
+			quickCreateWorkspaceID := parseUUID(qc.WorkspaceID)
+			projectCtx, projectErr := h.resolveClaimProjectContext(r.Context(), quickCreateProjectID, quickCreateWorkspaceID)
 			if projectErr != nil {
 				slog.Error("quick-create claim: load project context failed; preserving task for redelivery",
 					"task_id", uuidToString(task.ID),
@@ -4159,6 +4143,11 @@ func (h *Handler) buildClaimedTaskResponse(r *http.Request, task *db.AgentTaskQu
 				}
 			}
 			projectCtx.applyTo(&resp)
+			if projectCtx.ProjectID != "" && qc.SquadID == "" {
+				if _, failure := h.applyClaimProjectAgentWorkdir(r, &resp, task, runtime, quickCreateWorkspaceID, quickCreateProjectID); failure != nil {
+					return resp, deliveredCommentIDs, issueSnapshot, agentSkillCount, builtinSkillCount, failure
+				}
+			}
 
 			// Parent-issue resolution for quick-create tasks opened from
 			// "Add sub issue". The handler already verified workspace

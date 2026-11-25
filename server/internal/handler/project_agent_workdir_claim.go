@@ -2,10 +2,41 @@ package handler
 
 import (
 	"encoding/json"
+	"log/slog"
+	"net/http"
 	"path"
 	"slices"
 	"strings"
+
+	"github.com/jackc/pgx/v5/pgtype"
+	db "github.com/multica-ai/multica/server/pkg/db/generated"
+	"github.com/multica-ai/multica/server/pkg/protocol"
+	"github.com/multica-ai/multica/server/pkg/taskfailure"
 )
+
+func (h *Handler) applyClaimProjectAgentWorkdir(r *http.Request, resp *AgentTaskResponse, task *db.AgentTaskQueue, runtime db.AgentRuntime, workspaceID, projectID pgtype.UUID) (string, *claimBuildFailure) {
+	settings, err := h.loadProjectAgentWorkdirSettings(r.Context(), workspaceID, projectID)
+	if err != nil {
+		slog.Error("task claim: load project execution directories failed", "task_id", uuidToString(task.ID), "error", err)
+		return "", &claimBuildFailure{
+			outcome: "error_project_agent_workdir", status: http.StatusInternalServerError,
+			message: "failed to load project execution directories",
+		}
+	}
+	var daemonID string
+	if runtime.RuntimeMode == "local" && runtime.DaemonID.Valid {
+		daemonID = runtime.DaemonID.String
+	}
+	// A daemon that understands local worktrees also understands the
+	// in-place local_directory resource used for this binding.
+	path, rejection := routeProjectAgentWorkdir(resp, settings, uuidToString(task.AgentID), daemonID,
+		requestHasClientCapability(r, protocol.DaemonCapabilityLocalWorktreeV1))
+	if rejection != "" {
+		return "", h.failClaimedTaskBeforeLaunch(r.Context(), task, rejection, taskfailure.Reason("local_directory_error"),
+			"error_project_agent_workdir", http.StatusUnprocessableEntity, rejection)
+	}
+	return path, nil
+}
 
 // The daemon only needs the selected directory, in its existing resource format.
 // Filtering the older local resources here keeps the assignment unambiguous.

@@ -189,3 +189,77 @@ func TestIssueClaimUsesCurrentProjectAgentWorkdir(t *testing.T) {
 		})
 	}
 }
+
+func TestQuickCreateClaimUsesProjectAgentWorkdir(t *testing.T) {
+	const daemonID = "quick-create-project-workdir-test"
+	const fixedPath = "/home/runner/quick-create"
+	projectID := dbfx.Project(t, "Quick-create fixed directory")
+	quickContext, err := json.Marshal(map[string]string{
+		"type": "quick_create", "prompt": "Create an issue", "requester_id": testUserID,
+		"workspace_id": testWorkspaceID, "project_id": projectID,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() {
+		dbfx.Exec(t, `DELETE FROM project_agent_workdir WHERE workspace_id = $1 AND project_id = $2`, testWorkspaceID, projectID)
+	})
+
+	for _, tc := range []struct {
+		name, provider string
+		configured     bool
+	}{
+		{name: "configured agent", provider: "codex", configured: true},
+		{name: "unconfigured agent", provider: "opencode"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			runtimeID := dbfx.Runtime(t, tc.name, testutil.Cols{
+				"daemon_id": daemonID, "runtime_mode": "local", "provider": tc.provider,
+			})
+			agentID := dbfx.Agent(t, tc.name, runtimeID, testutil.Cols{"runtime_mode": "local"})
+			bindings := map[string]map[string]string{}
+			if tc.configured {
+				bindings[agentID] = map[string]string{"daemon_id": daemonID, "local_path": fixedPath}
+			}
+			data, err := json.Marshal(bindings)
+			if err != nil {
+				t.Fatal(err)
+			}
+			dbfx.Exec(t, `INSERT INTO project_agent_workdir (workspace_id, project_id, enabled, bindings)
+				VALUES ($1, $2, true, $3) ON CONFLICT (workspace_id, project_id) DO UPDATE SET bindings = EXCLUDED.bindings`,
+				testWorkspaceID, projectID, data)
+			taskID := dbfx.Task(t, agentID, testutil.Cols{"runtime_id": runtimeID, "context": quickContext})
+			req := newOwnerDaemonRequest("POST", "/api/daemon/runtimes/"+runtimeID+"/claim", nil)
+			req = withURLParam(req, "runtimeId", runtimeID)
+			req.Header.Set("X-Client-Capabilities", protocol.DaemonCapabilityLocalWorktreeV1)
+			var resp struct{ Task *AgentTaskResponse }
+			testutil.Call(t, testHandler.ClaimTaskByRuntime, req).Want(http.StatusOK).JSON(&resp)
+
+			if !tc.configured {
+				if resp.Task != nil {
+					t.Fatalf("an unconfigured agent received quick-create run %s", resp.Task.ID)
+				}
+				var status, failure string
+				dbfx.QueryRow(t, `SELECT status, failure_reason FROM agent_task_queue WHERE id = $1`, taskID).
+					Scan(&status, &failure)
+				if status != "failed" || failure != "local_directory_error" {
+					t.Fatalf("run settled as (%q, %q)", status, failure)
+				}
+				return
+			}
+			if resp.Task == nil || resp.Task.ID != taskID || resp.Task.ProjectID != projectID {
+				t.Fatalf("expected quick-create run %s for project %s, got %+v", taskID, projectID, resp.Task)
+			}
+			if len(resp.Task.ProjectResources) != 1 || resp.Task.ProjectResources[0].ResourceType != "local_directory" {
+				t.Fatalf("quick-create resources = %+v, want one local directory", resp.Task.ProjectResources)
+			}
+			var ref localDirectoryRef
+			if err := json.Unmarshal(resp.Task.ProjectResources[0].ResourceRef, &ref); err != nil {
+				t.Fatal(err)
+			}
+			if ref.LocalPath != fixedPath || ref.DaemonID != daemonID || ref.ExecutionMode != localDirectoryModeInPlace {
+				t.Fatalf("quick-create workdir = %+v, want %q in place on %q", ref, fixedPath, daemonID)
+			}
+		})
+	}
+}
