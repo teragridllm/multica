@@ -67,6 +67,7 @@ import {
 } from "./local-directory-mode-options";
 import { GithubRefField, githubRefHasError } from "./github-ref-field";
 import { localDirectoryLabel } from "./local-directory-label";
+import { ProjectAgentWorkdirsSection } from "./project-agent-workdirs";
 import { buildRuntimeMachines } from "../../runtimes/components/runtime-machines";
 import { useT } from "../../i18n";
 import { githubShortLabel } from "../../common/github-url";
@@ -174,6 +175,7 @@ export function ProjectResourcesSection({ projectId }: { projectId: string }) {
           {others.map((resource) => (
             <UnknownResourceRow key={resource.id} resource={resource} />
           ))}
+          <ProjectAgentWorkdirsSection key={projectId} wsId={wsId} projectId={projectId} />
         </div>
       )}
     </div>

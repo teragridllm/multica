@@ -3378,6 +3378,30 @@ func (h *Handler) buildClaimedTaskResponse(r *http.Request, task *db.AgentTaskQu
 		}
 		projectCtx.applyTo(&resp)
 		resp.ProjectWorkflow = projectWorkflow
+		var fixedWorkdir string
+		if projectCtx.ProjectID != "" && !task.IsLeaderTask && !task.SquadID.Valid && !task.AutopilotRunID.Valid {
+			settings, err := h.loadProjectAgentWorkdirSettings(r.Context(), issue.WorkspaceID, issue.ProjectID)
+			if err != nil {
+				slog.Error("issue claim: load project execution directories failed", "task_id", uuidToString(task.ID), "error", err)
+				return resp, deliveredCommentIDs, issueSnapshot, agentSkillCount, builtinSkillCount, &claimBuildFailure{
+					outcome: "error_project_agent_workdir", status: http.StatusInternalServerError,
+					message: "failed to load project execution directories",
+				}
+			}
+			var daemonID, rejection string
+			if runtime.RuntimeMode == "local" && runtime.DaemonID.Valid {
+				daemonID = runtime.DaemonID.String
+			}
+			// A daemon that understands local worktrees also understands the
+			// in-place local_directory resource used for this binding.
+			fixedWorkdir, rejection = routeProjectAgentWorkdir(&resp, settings, uuidToString(task.AgentID), daemonID,
+				requestHasClientCapability(r, protocol.DaemonCapabilityLocalWorktreeV1))
+			if rejection != "" {
+				return resp, deliveredCommentIDs, issueSnapshot, agentSkillCount, builtinSkillCount,
+					h.failClaimedTaskBeforeLaunch(r.Context(), task, rejection, taskfailure.Reason("local_directory_error"),
+						"error_project_agent_workdir", http.StatusUnprocessableEntity, rejection)
+			}
+		}
 
 		// Load every planned input as one chronological, de-duplicated set.
 		// The trigger is included here so the delivery receipt can only contain
@@ -3632,6 +3656,9 @@ func (h *Handler) buildClaimedTaskResponse(r *http.Request, task *db.AgentTaskQu
 			// parent's workdir, never its session. A force_fresh task with no
 			// retry lineage still resumes nothing.
 			applyFreshSessionRetryWorkdir(*task, &resp, requestHasClientCapability(r, protocol.DaemonCapabilityCheckoutKeepsWorkV1))
+		}
+		if clearProjectAgentWorkdirResume(&resp, fixedWorkdir) {
+			resumeAnchor = nil
 		}
 
 		// MUL-8218: a comment edit cancels the affected run and retriggers from

@@ -130,6 +130,7 @@ import type {
   CreateProjectResourceRequest,
   UpdateProjectResourceRequest,
   ListProjectResourcesResponse,
+  ProjectAgentWorkdirs,
   Label,
   IssueProperty,
   IssuePropertyValue,
@@ -389,6 +390,7 @@ import {
   RuntimeUsageListSchema,
   RuntimeRateLimitsResponseSchema,
   SearchIssuesResponseSchema,
+  ProjectAgentWorkdirsSchema,
   ProjectSchema,
   ArchiveProjectResponseSchema,
   ListProjectMembersResponseSchema,
@@ -4660,6 +4662,37 @@ export class ApiClient {
     await this.fetch(`/api/projects/${projectId}/resources/${resourceId}`, {
       method: "DELETE",
     });
+  }
+
+  private async fetchProjectAgentWorkdirs(
+    projectId: string,
+    method: "GET" | "PUT" | "DELETE",
+    agentId?: string,
+    data?: { enabled: boolean } | { local_path: string; expected_daemon_id: string },
+  ): Promise<ProjectAgentWorkdirs | null> {
+    const path = `/api/projects/${projectId}/agent-workdirs${agentId ? `/${agentId}` : ""}`;
+    const raw = await this.fetch<unknown>(path, { method, body: JSON.stringify(data) });
+    const endpoint = `${method} /api/projects/{id}/agent-workdirs${agentId ? "/{agentId}" : ""}`;
+    return parseWithFallback<ProjectAgentWorkdirs | null>(raw, ProjectAgentWorkdirsSchema, null, { endpoint });
+  }
+
+  getProjectAgentWorkdirs(projectId: string): Promise<ProjectAgentWorkdirs | null> {
+    return this.fetchProjectAgentWorkdirs(projectId, "GET");
+  }
+
+  setProjectAgentWorkdirsEnabled(projectId: string, enabled: boolean): Promise<ProjectAgentWorkdirs | null> {
+    return this.fetchProjectAgentWorkdirs(projectId, "PUT", undefined, { enabled });
+  }
+
+  setProjectAgentWorkdir(projectId: string, agentId: string, localPath: string, expectedDaemonId: string): Promise<ProjectAgentWorkdirs | null> {
+    return this.fetchProjectAgentWorkdirs(projectId, "PUT", agentId, {
+      local_path: localPath,
+      expected_daemon_id: expectedDaemonId,
+    });
+  }
+
+  deleteProjectAgentWorkdir(projectId: string, agentId: string): Promise<ProjectAgentWorkdirs | null> {
+    return this.fetchProjectAgentWorkdirs(projectId, "DELETE", agentId);
   }
 
   // Labels

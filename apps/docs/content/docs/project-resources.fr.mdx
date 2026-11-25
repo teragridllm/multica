@@ -24,7 +24,7 @@ Lorsqu'un agent traite une tâche du projet, Multica ajoute le nom du projet, sa
 
 La liste des dépôts rattachés à l'espace de travail est toujours incluse dans le contexte de l'exécution. Les dépôts rattachés au projet précisent en plus le code et la ref par défaut qu'utilise cet ensemble de travail.
 
-Un répertoire local ne s'applique qu'au daemon auquel il est lié. Lorsque le daemon chargé d'une exécution dispose d'un répertoire local correspondant, l'agent utilise le répertoire d'origine en mode `in_place`, ou un worktree isolé de celui-ci en mode `worktree` ; les autres ordinateurs continuent d'utiliser les dépôts du projet ou de l'espace de travail.
+Un dossier local partagé est lié à un daemon. Si le daemon chargé d'une exécution dispose du dossier correspondant, l'agent travaille dans le dossier en mode `in_place` ou dans un worktree isolé en mode `worktree`. Les autres ordinateurs utilisent les dépôts du projet ou de l'espace de travail. Pour les exécutions de tâches confiées à un agent précis, vous pouvez aussi activer un [répertoire fixe par agent](#fixed-directories).
 
 ## Ajouter un dépôt GitHub
 
@@ -38,7 +38,7 @@ La `ref` d'une ressource définit la branche, le tag ou le commit que les checko
 
 ## Ajouter un répertoire local
 
-L'interface d'ajout d'un répertoire local n'existe que dans l'application de bureau, car les navigateurs ne peuvent pas sélectionner de dossiers sur votre ordinateur.
+Utilisez l'application de bureau pour choisir un dossier local partagé pour le projet.
 
 <Callout type="warning">
 **Réservez cette option aux cas particuliers ; ne la choisissez pas par commodité.** `local_directory` existe pour les personnes qui n'ont pas d'autre choix, typiquement un projet de jeu dont le checkout pèse des dizaines de gigaoctets et qu'il est impossible de recloner à chaque exécution.
@@ -73,17 +73,31 @@ La présélection ne s'applique qu'au répertoire que vous rattachez maintenant.
 
 Le répertoire doit être un chemin absolu, doit déjà exister et doit être accessible en lecture et en écriture par le daemon actuel. Les chemins suivants sont refusés : les racines système et les racines de lecteur (`/`, `C:\`), les répertoires personnels eux-mêmes et leurs répertoires parents (comme `/Users`, `/home`, `/root`), ainsi que les répertoires système comme `/etc`, `/var`, `/tmp`, `/usr` et `/opt`. Si le chemin choisi est un lien symbolique, il est d'abord résolu en son chemin réel, puis validé à nouveau selon les mêmes règles ; le verrou de sérialisation s'applique lui aussi au chemin réel.
 
-Chaque projet peut rattacher au plus un répertoire local par daemon. Les différents ordinateurs d'une équipe peuvent chacun rattacher leur propre répertoire pour le même projet.
+Chaque projet peut rattacher un dossier partagé par daemon. Les différents ordinateurs d'une équipe peuvent chacun rattacher leur propre répertoire pour le même projet.
 
 <Callout type="warning">
 En mode `in_place` (par défaut), un répertoire local n'est pas un environnement isolé : l'agent voit et modifie directement votre branche actuelle et vos fichiers non commités, et Multica ne change pas automatiquement de branche, ne fait ni stash, ni commit, ni push, et n'ouvre pas de PR. Le mode worktree fonctionne autrement, voir [Comment les exécutions partagent le répertoire](#comment-les-exécutions-partagent-le-répertoire) ci-dessous.
 </Callout>
 
+<span id="fixed-directories" />
+
+## Définir un répertoire fixe par agent
+
+Sur le Web ou dans l'application de bureau, ouvrez le projet et accédez à **Ressources → Répertoires d’exécution**. Activez **Répertoire fixe par agent**, sélectionnez un agent, puis saisissez le chemin absolu d'un répertoire existant sur l'ordinateur auquel il est associé. Vous pouvez saisir le chemin d'un ordinateur distant, même sans session de bureau. Le daemon doit être à jour et pouvoir lire et écrire dans le répertoire. Les restrictions de chemin des dossiers locaux partagés s'appliquent également.
+
+Les membres qui ont accès au projet peuvent consulter les chemins enregistrés. Seul le propriétaire de l'ordinateur associé peut ajouter ou modifier un chemin.
+
+L'agent travaille directement dans le répertoire fixe, avec accès à la branche actuelle et aux fichiers non commités. Les exécutions qui utilisent le même répertoire sur le même ordinateur se succèdent selon les [règles du mode Direct](#comment-les-exécutions-partagent-le-répertoire).
+
+Ce réglage s'applique lorsqu'un agent précis est désigné ou @mentionné sur une tâche, y compris pour les nouvelles tentatives et les exécutions de suivi. Le runtime lit le réglage en vigueur lorsqu'il prend en charge l'exécution. Un changement de répertoire ouvre une nouvelle session. Si aucun répertoire n'est configuré, ou si le chemin configuré est introuvable ou invalide, l'exécution échoue avant le démarrage de l'agent. Si vous déplacez l'agent vers un autre ordinateur, enregistrez à nouveau le chemin pour cet ordinateur, même si le chemin absolu est identique.
+
+Ce réglage est désactivé par défaut. Lorsqu'il est désactivé, le projet peut utiliser ses dépôts et dossiers locaux partagés.
+
 <span id="how-tasks-share-the-directory" />
 
 ## Comment les exécutions partagent le répertoire
 
-Un répertoire local dispose de deux modes d'exécution, définis par ressource avec `execution_mode`. L'application de bureau les nomme **Modifier directement** et **Exécuter en parallèle** lors de l'ajout d'un dossier, puis **Direct** et **Parallèle** sur l'étiquette du mode du dossier ; l'API, le CLI et le reste de cette page utilisent les identifiants.
+Un dossier local partagé dispose de deux modes d'exécution, définis par ressource avec `execution_mode`. L'application de bureau les nomme **Modifier directement** et **Exécuter en parallèle** lors de l'ajout d'un dossier, puis **Direct** et **Parallèle** sur l'étiquette du mode du dossier ; l'API, le CLI et le reste de cette page utilisent les identifiants.
 
 <LocalDirModeDemo />
 
@@ -233,7 +247,7 @@ multica project resource update <project-id> <resource-id> --execution-mode in_p
 multica project resource remove <project-id> <resource-id>
 ```
 
-Les modifications de ressources s'appliquent aux exécutions créées ensuite ; elles ne réécrivent pas les enregistrements des exécutions déjà terminées.
+Les modifications des dépôts rattachés et des dossiers partagés s'appliquent aux exécutions créées ensuite.
 
 ## Étapes suivantes
 

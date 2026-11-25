@@ -1621,6 +1621,13 @@ type Project struct {
 	FolderID       pgtype.UUID        `json:"folder_id"`
 }
 
+type ProjectAgentWorkdir struct {
+	WorkspaceID pgtype.UUID `json:"workspace_id"`
+	ProjectID   pgtype.UUID `json:"project_id"`
+	Enabled     bool        `json:"enabled"`
+	Bindings    []byte      `json:"bindings"`
+}
+
 type ProjectFolder struct {
 	ID          pgtype.UUID        `json:"id"`
 	WorkspaceID pgtype.UUID        `json:"workspace_id"`

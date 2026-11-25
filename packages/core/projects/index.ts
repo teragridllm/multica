@@ -17,6 +17,11 @@ export {
   ProjectDeletionOfflineError,
 } from "./mutations";
 export { isProjectArchived, selectableProjects } from "./archive";
+export {
+  isProjectAgentWorkdirsUnsupported,
+  projectAgentWorkdirsOptions,
+  useUpdateProjectAgentWorkdirs,
+} from "./agent-workdirs";
 export { useProjectDraftStore } from "./draft-store";
 export {
   useProjectViewStore,

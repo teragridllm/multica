@@ -213,3 +213,14 @@ export interface ListProjectResourcesResponse {
   resources: ProjectResource[];
   total: number;
 }
+
+export interface ProjectAgentWorkdirBinding {
+  agentId: string;
+  daemonId: string;
+  localPath: string;
+}
+
+export interface ProjectAgentWorkdirs {
+  enabled: boolean;
+  bindings: ProjectAgentWorkdirBinding[];
+}

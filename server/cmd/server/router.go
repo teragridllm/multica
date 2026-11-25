@@ -2350,6 +2350,10 @@ func NewRouterWithOptions(pool *pgxpool.Pool, hub *realtime.Hub, bus *events.Bus
 					r.Post("/resources", h.CreateProjectResource)
 					r.Put("/resources/{resourceId}", h.UpdateProjectResource)
 					r.Delete("/resources/{resourceId}", h.DeleteProjectResource)
+					r.Get("/agent-workdirs", h.GetProjectAgentWorkdirSettings)
+					r.Put("/agent-workdirs", h.UpdateProjectAgentWorkdirSettings)
+					r.Put("/agent-workdirs/{agentId}", h.SetProjectAgentWorkdirBinding)
+					r.Delete("/agent-workdirs/{agentId}", h.DeleteProjectAgentWorkdirBinding)
 				})
 			})
 

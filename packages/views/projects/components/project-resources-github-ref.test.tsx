@@ -99,6 +99,7 @@ vi.mock("../../platform/use-local-daemon-status", () => ({
   useLocalDaemonStatus: () => ({ daemonId: null, deviceName: null, running: false }),
 }));
 vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
+vi.mock("./project-agent-workdirs", () => ({ ProjectAgentWorkdirsSection: () => null }));
 
 import { ProjectResourcesSection } from "./project-resources-section";
 

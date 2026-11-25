@@ -1828,6 +1828,19 @@ export const ProjectSchema = z.object({
   archived_by_id: z.string().nullable().default(null).catch(null),
 }).loose();
 
+export const ProjectAgentWorkdirsSchema = z.object({
+  enabled: z.boolean(),
+  bindings: z.array(z.object({
+    agent_id: z.string().min(1),
+    daemon_id: z.string().min(1),
+    local_path: z.string().min(1),
+  }).transform(({ agent_id, daemon_id, local_path }) => ({
+    agentId: agent_id,
+    daemonId: daemon_id,
+    localPath: local_path,
+  }))),
+});
+
 export const ArchiveProjectResponseSchema = ProjectSchema.extend({
   paused_autopilot_ids: z.array(z.string()).default([]).catch([]),
 });

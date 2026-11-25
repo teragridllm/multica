@@ -2,7 +2,11 @@
 
 import { useQuery } from "@tanstack/react-query";
 import { FolderOpen, GitBranch } from "@multica/ui/icons";
-import { projectResourcesOptions } from "@multica/core/projects";
+import {
+  isProjectAgentWorkdirsUnsupported,
+  projectAgentWorkdirsOptions,
+  projectResourcesOptions,
+} from "@multica/core/projects";
 import type { Agent, LocalDirectoryResourceRef, ProjectResource } from "@multica/core/types";
 import { useWorkspaceId } from "@multica/core/hooks";
 import { isAgentRuntimeBound } from "@multica/core/agents";
@@ -57,19 +61,20 @@ export function LocalDirectoryHint({
     enabled: Boolean(projectId),
   });
 
-  if (!projectId) return null;
-  if (!daemon.daemonId) return null;
-  if (!targetDaemonId) return null;
+  const matches = targetDaemonId
+    ? resources
+      .filter((resource): resource is ProjectResource & { resource_ref: LocalDirectoryResourceRef } =>
+        resource.resource_type === "local_directory")
+      .filter((resource) => resource.resource_ref.daemon_id === targetDaemonId)
+    : [];
+  const workdirs = useQuery({
+    ...projectAgentWorkdirsOptions(wsId, projectId ?? ""),
+    enabled: Boolean(projectId && daemon.daemonId && matches.length),
+  });
 
-  const matches: Array<ProjectResource & { resource_ref: LocalDirectoryResourceRef }> =
-    resources
-      .filter(
-        (r): r is ProjectResource & { resource_ref: LocalDirectoryResourceRef } =>
-          r.resource_type === "local_directory",
-      )
-      .filter((r) => r.resource_ref.daemon_id === targetDaemonId);
-
-  if (matches.length === 0) return null;
+  if (!projectId || !daemon.daemonId || matches.length === 0) return null;
+  const showLegacy = workdirs.data ? !workdirs.data.enabled : isProjectAgentWorkdirsUnsupported(workdirs.error);
+  if (!showLegacy) return null;
 
   return (
     <div className="mt-3 space-y-1 rounded-md border border-dashed bg-muted/40 px-3 py-2 text-caption text-muted-foreground">

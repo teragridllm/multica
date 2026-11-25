@@ -24,7 +24,7 @@ When an agent works an issue inside the project, Multica adds the project name, 
 
 The workspace's linked repository list is always included in the run context. Repositories linked to the project additionally specify the code and default ref this body of work uses.
 
-A local directory only applies to the daemon it is bound to. When the daemon executing a run has a matching local directory, the agent uses it in `in_place` mode or an isolated worktree of it in `worktree` mode; other computers keep using the project's GitHub repositories or the workspace repositories.
+A shared local folder applies to the daemon it is bound to. When the daemon executing a run has a matching folder, the agent works in it in `in_place` mode or in an isolated worktree in `worktree` mode. Other computers use the project's GitHub repositories or the workspace repositories. You can also opt in to [fixed directories per agent](#fixed-directories) for issue runs handled by a specific agent.
 
 ## Add a GitHub repository
 
@@ -38,7 +38,7 @@ A resource's `ref` sets the branch, tag, or commit that later checkouts use by d
 
 ## Add a local directory
 
-The UI for adding a local directory is Desktop-only, because browsers cannot pick folders on your computer.
+Use Desktop to pick a shared local folder for the project.
 
 <Callout type="warning">
 **This is for special cases; do not pick it just because it is convenient.** `local_directory` exists for people who have no other option — the canonical case is a game project whose checkout is tens of gigabytes, where re-cloning per run is simply not viable.
@@ -73,17 +73,31 @@ Preselection applies only to a directory you are linking now. A directory linked
 
 The directory must be an absolute path, must already exist, and must be readable and writable by the current daemon. These paths are rejected: system roots and drive roots (`/`, `C:\`), home directories themselves and the parents of home directories (such as `/Users`, `/home`, `/root`), and system directories such as `/etc`, `/var`, `/tmp`, `/usr`, and `/opt`. If the chosen path is a symlink, it is resolved to its real path first and validated again by the same rules; the serial lock also applies to the real path.
 
-Each project can link at most one local directory per daemon. Different computers on a team can each link their own directory for the same project.
+Each project can link one shared folder per daemon. Different computers on a team can each link their own directory for the same project.
 
 <Callout type="warning">
 In the default `in_place` mode a local directory is not an isolated environment: the agent directly sees and modifies your current branch and uncommitted files, and Multica does not automatically switch branches, stash, commit, push, or open PRs. Worktree mode is different — see [How runs share the directory](#how-runs-share-the-directory) below.
 </Callout>
 
+<span id="fixed-directories" />
+
+## Set a fixed directory per agent
+
+On Web or Desktop, open the project and go to **Resources → Execution directories**. Turn on **Fixed directory per agent**, select an agent, and enter an absolute path to an existing directory on its connected machine. You can type the path for a remote machine, including one without a desktop session. The connected daemon must be up to date and able to read and write the directory. The path restrictions listed for shared local folders also apply.
+
+Members who can open the project can see the saved paths. To add or edit a path, you must own the connected machine.
+
+The agent works directly in the fixed directory, including on the current branch and uncommitted files. Runs that use the same directory on the same machine take turns under the [Direct mode rules](#how-runs-share-the-directory).
+
+This setting applies when a specific agent is assigned or @mentioned on an issue, including retries and follow-up runs. Each run reads the latest setting when claimed. Changing the directory starts a new session. If the agent has no directory configured, or the configured path is missing or invalid, the run fails before the agent starts. If you move the agent to another machine, save the path again for that machine, even if the absolute path is identical.
+
+The setting is off by default. With it off, the project can use linked repositories and shared local folders.
+
 <span id="how-tasks-share-the-directory" />
 
 ## How runs share the directory
 
-A local directory has two execution modes, set per resource with `execution_mode`. Desktop shows them as **Edit directly** and **Run in parallel** when you add a folder, and as **Direct** and **Parallel** on the folder's mode label; the API, the CLI and the rest of this page use the identifiers.
+A shared local folder has two execution modes, set per resource with `execution_mode`. Desktop shows them as **Edit directly** and **Run in parallel** when you add a folder, and as **Direct** and **Parallel** on the folder's mode label; the API, the CLI and the rest of this page use the identifiers.
 
 <LocalDirModeDemo />
 
@@ -233,7 +247,7 @@ multica project resource update <project-id> <resource-id> --execution-mode in_p
 multica project resource remove <project-id> <resource-id>
 ```
 
-Resource changes affect runs created afterwards; they do not rewrite records of runs that already ended.
+Changes to linked repositories and shared folder resources apply to runs created afterwards.
 
 ## Next steps
 

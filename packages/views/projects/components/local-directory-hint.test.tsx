@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { ApiError } from "@multica/core/api";
 import { I18nProvider } from "@multica/core/i18n/react";
 import type { Agent, ProjectResource } from "@multica/core/types";
 import enCommon from "../../locales/en/common.json";
@@ -24,11 +25,14 @@ vi.mock("@multica/core/hooks", () => ({
 
 const mockListResources = vi.hoisted(() => vi.fn());
 const mockListRuntimes = vi.hoisted(() => vi.fn());
+const mockWorkdirs = vi.hoisted(() => vi.fn());
 
-vi.mock("@multica/core/api", () => ({
+vi.mock("@multica/core/api", async (importOriginal) => ({
+  ...await importOriginal<typeof import("@multica/core/api")>(),
   api: {
     listProjectResources: (...args: unknown[]) => mockListResources(...args),
     listRuntimes: (...args: unknown[]) => mockListRuntimes(...args),
+    getProjectAgentWorkdirs: (...args: unknown[]) => mockWorkdirs(...args),
   },
 }));
 
@@ -84,6 +88,7 @@ describe("LocalDirectoryHint", () => {
     mockDaemonStatus.running = false;
     mockListResources.mockReset();
     mockListRuntimes.mockReset().mockResolvedValue([]);
+    mockWorkdirs.mockReset().mockResolvedValue({ enabled: false, bindings: [] });
   });
 
   it("shows the assigned agent's directory instead of the viewer's directory (#8861)", async () => {
@@ -158,6 +163,33 @@ describe("LocalDirectoryHint", () => {
       expect(screen.getByText("work")).toBeInTheDocument();
     });
     expect(screen.getByText(/Users\/foo\/work/)).toBeInTheDocument();
+  });
+
+  it("hides the machine-wide folder hint when fixed directories are enabled", async () => {
+    mockDaemonStatus.daemonId = "daemon-A";
+    mockListResources.mockResolvedValue({
+      resources: [makeLocalDirectoryResource({ daemon_id: "daemon-A", local_path: "/repos/legacy" })],
+      total: 1,
+    });
+    mockWorkdirs.mockResolvedValue({ enabled: true, bindings: [] });
+
+    const { queryClient } = renderHint("proj-1");
+    await waitFor(() => expect(mockWorkdirs).toHaveBeenCalledWith("proj-1"));
+    await waitFor(() => expect(queryClient.isFetching()).toBe(0));
+    expect(screen.queryByText(/\/repos\/legacy/)).not.toBeInTheDocument();
+  });
+
+  it("keeps the machine-wide folder hint on an older server", async () => {
+    mockDaemonStatus.daemonId = "daemon-A";
+    mockListResources.mockResolvedValue({
+      resources: [makeLocalDirectoryResource({ daemon_id: "daemon-A", local_path: "/repos/legacy", label: "Legacy folder" })],
+      total: 1,
+    });
+    mockWorkdirs.mockRejectedValue(new ApiError("Not found", 404, "Not Found"));
+
+    renderHint("proj-1");
+
+    expect(await screen.findByText("Legacy folder")).toBeInTheDocument();
   });
 
   // The banner used to say "in-place" for every local_directory resource.
